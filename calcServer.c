@@ -18,6 +18,8 @@ struct Client_conn {
 	int client_fd;
 	// Shared Calc object
 	struct Calc *calc;
+	// Pointer to server status
+	int *status;
 }; 
 
 // Thread start function
@@ -51,18 +53,20 @@ int main(int argc, char **argv) {
   	while (keep_going) {
 		struct Client_conn *conn = malloc(sizeof(struct Client_conn));
 		if (!conn) {
-			// TODO error check instead?
+			// TODO error check instead? or exit?
 			continue;
 		}
 		// Link to shared calculator
 		conn->calc = calc;
+		// Connect to server status
+		conn->status = &keep_going;
 		// Try to accept connection
     		conn->client_fd = Accept(server_fd, NULL, NULL);
+
     		// Case: successful connection
 		if (conn->client_fd > 0) {
 			// Open new thread to chat with client
 			pthread_create(&tid, NULL, thread_start, conn);
-			// TODO how to deal with changing keep_going to shutdown?
 
 		} else {
 			// Free connection storage in case of failed connection
@@ -81,6 +85,7 @@ void *thread_start(void *vargp) {
 	struct Client_conn *conn = (struct Client_conn *)vargp;
 	int client_fd = conn->client_fd;
 	struct Calc *calc = conn->calc;
+	int *status = conn->status;
 	pthread_detach(pthread_self());
 	free(vargp);
 	
@@ -98,19 +103,17 @@ void *thread_start(void *vargp) {
 		ssize_t n = rio_readlineb(&in, linebuf, LINEBUF_SIZE);
 		if (n <= 0) {
 			// error or end of input 
-			//return 1;
 			close(client_fd);
 			return NULL;
 		} 
 		else if (strcmp(linebuf, "quit\n") == 0 || strcmp(linebuf, "quit\r\n") == 0) {
 			// quit command 
-			//return 1;
 			close(client_fd);
 			return NULL;
 		} 
 		else if (strcmp(linebuf, "shutdown\n") == 0 || strcmp(linebuf, "shutdown\r\n") == 0) {
       			// shutdown command 
-      			//return 0;
+      			*status = 0;
       			close(client_fd);
       			return NULL;
     		} 
@@ -129,7 +132,6 @@ void *thread_start(void *vargp) {
 			}
 		}
 	}
-	//return 1;
 	close(client_fd);
 	return NULL;
 }
