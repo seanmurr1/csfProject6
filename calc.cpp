@@ -1,5 +1,5 @@
 /*
- * CSF A5
+ * CSF A6
  * Shelby Coe : scoe4
  * Sean Murray : smurra42
  */
@@ -23,12 +23,21 @@ struct Calc {
 private:
     // Map to store persisting variables
     map<string, int> dictionary;
+    pthread_mutex_t lock; 
 
 public:
 
-    // Empty constructor and destructor
-    Calc() { }
-    ~Calc() { }
+    // Constructor 
+    Calc() { 
+   	// Initialize mutex
+        pthread_mutex_lock(&lock);
+    }
+
+    // Destructor
+    ~Calc() { 
+	// Destroy mutex
+	pthread_mutex_destroy(&lock);
+    }
 
     // Evaluates a string expression and tries to store result 
     // Returns 1 on success, 0 on failure
@@ -92,12 +101,19 @@ private:
         if (!checkVar(tokens[0])) {
             return 0;
         }
+
+	// CRITICAL SECTION
+	pthread_mutex_lock(&lock);
+
         // Obtaining operand
         if (!evalToken(tokens[2], result)) {
             return 0;
         }
 	// Storing result
         dictionary[tokens[0]] = result;
+
+	pthread_mutex_unlock(&lock);
+
         return 1;
     }
 
@@ -111,6 +127,10 @@ private:
         if (!checkVar(tokens[0])) {
             return 0;
         }
+
+	// CRITICAL SECTION
+	
+	pthread_mutex_lock(&lock);
 
         // Attempting to obtain operands
         int val1;
@@ -129,6 +149,9 @@ private:
         }
         // Storing value
         dictionary[tokens[0]] = result;
+
+	pthread_mutex_unlock(&lock);
+
         return 1;
     }
 
