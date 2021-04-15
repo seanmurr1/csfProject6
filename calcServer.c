@@ -1,15 +1,27 @@
 /*
- * CSF Assignment 5
+ * CSF Assignment 6 
  * Shelby Coe : scoe4
  * Sean Murray : smurra42
  */
 
+// Includes:
 #include <stdio.h>      /* for snprintf */
 #include "csapp.h"
 #include "calc.h"
 
 /* buffer size for reading lines of input from user */
 #define LINEBUF_SIZE 1024
+
+// Struct encapsulating data needed for a client connection
+struct Client_conn {
+	// Client socket file descriptor
+	int client_fd;
+	// Shared Calc object
+	struct Calc *calc;
+}; 
+
+// Thread start function
+void *thread_start(void *vargp);
 
 // Function to chat with client
 int chat_with_client(struct Calc *calc, int client_fd);
@@ -31,21 +43,95 @@ int main(int argc, char **argv) {
 	// Creating calc struct for server
   	struct Calc *calc = calc_create();
 
+	// Thread ID
+	pthread_t tid;
+
 	// Loop to accept client requests
   	int keep_going = 1;
   	while (keep_going) {
+		struct Client_conn *conn = malloc(sizeof(struct Client_conn));
+		if (!conn) {
+			// TODO error check instead?
+			continue;
+		}
+		// Link to shared calculator
+		conn->calc = calc;
 		// Try to accept connection
-    		int client_fd = Accept(server_fd, NULL, NULL);
-    		if (client_fd > 0) {
-			// Chat with client and then close connection
-			keep_going = chat_with_client(calc, client_fd);
-			close(client_fd);
+    		conn->client_fd = Accept(server_fd, NULL, NULL);
+    		// Case: successful connection
+		if (conn->client_fd > 0) {
+			// Open new thread to chat with client
+			pthread_create(&tid, NULL, thread_start, conn);
+			// TODO how to deal with changing keep_going to shutdown?
+
+		} else {
+			// Free connection storage in case of failed connection
+			free(conn);
 		}
   	}
 	// Close server and destroy calc object
   	close(server_fd);
   	calc_destroy(calc);
   	return 0;
+}
+
+
+void *thread_start(void *vargp) {
+	// Obtaining connection info
+	struct Client_conn *conn = (struct Client_conn *)vargp;
+	int client_fd = conn->client_fd;
+	struct Calc *calc = conn->calc;
+	pthread_detach(pthread_self());
+	free(vargp);
+	
+	// Process connection
+	rio_t in;
+	// Wrap to client
+	rio_readinitb(&in, client_fd);
+	// Buffer for input
+	char linebuf[LINEBUF_SIZE];
+	
+	// Loop to obtain input
+	int done = 0;
+	while (!done) {
+		// Read input
+		ssize_t n = rio_readlineb(&in, linebuf, LINEBUF_SIZE);
+		if (n <= 0) {
+			// error or end of input 
+			//return 1;
+			close(client_fd);
+			return NULL;
+		} 
+		else if (strcmp(linebuf, "quit\n") == 0 || strcmp(linebuf, "quit\r\n") == 0) {
+			// quit command 
+			//return 1;
+			close(client_fd);
+			return NULL;
+		} 
+		else if (strcmp(linebuf, "shutdown\n") == 0 || strcmp(linebuf, "shutdown\r\n") == 0) {
+      			// shutdown command 
+      			//return 0;
+      			close(client_fd);
+      			return NULL;
+    		} 
+		else {
+			// process input line 
+			int result;
+			if (calc_eval(calc, linebuf, &result) == 0) {
+				// expression couldn't be evaluated 
+				rio_writen(client_fd, "Error\n", 6);
+			} else {
+				// output result to client 
+				int len = snprintf(linebuf, LINEBUF_SIZE, "%d\n", result);
+				if (len < LINEBUF_SIZE) {
+					rio_writen(client_fd, linebuf, len);
+				}
+			}
+		}
+	}
+	//return 1;
+	close(client_fd);
+	return NULL;
 }
 
 // Function to chat with client
