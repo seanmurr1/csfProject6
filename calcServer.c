@@ -19,8 +19,9 @@ struct Client_conn {
 	int server_fd;
 	// Shared Calc object
 	struct Calc *calc;
-	// Pointer to server status
-	int *status;
+	
+	pthread_t main_id;
+
 }; 
 
 // Thread start function
@@ -42,23 +43,19 @@ int main(int argc, char **argv) {
   	if (server_fd < 0) {
    		return -1;
   	}
-	
 	// Creating calc struct for server
   	struct Calc *calc = calc_create();
-
 	// Thread ID
 	pthread_t tid;
-	// Client fd
-	int client_fd;
 
 	// Loop to accept client requests
   	int keep_going = 1;
   	while (keep_going) {
 		// Try to accept connection
-    		client_fd = Accept(server_fd, NULL, NULL);
-
+    		int client_fd = Accept(server_fd, NULL, NULL);
     		// Case: successful connection
 		if (client_fd > 0) {
+			// Storing connetion info
 			struct Client_conn *conn = malloc(sizeof(struct Client_conn));
 			if (!conn) {
 				close(client_fd);
@@ -66,12 +63,12 @@ int main(int argc, char **argv) {
 			}
 			// Link to shared calculator
 			conn->calc = calc;
+			// Store meta-data
 			conn->server_fd = server_fd;
 			conn->client_fd = client_fd;
-			conn->status = &keep_going;
+			conn->main_id = pthread_self();
 			// Open new thread to chat with client
 			pthread_create(&tid, NULL, thread_start, conn);
-
 		} 
   	}
 	// Close server and destroy calc object
@@ -87,13 +84,19 @@ void *thread_start(void *vargp) {
 	int client_fd = conn->client_fd;
 	int server_fd = conn->server_fd;
 	struct Calc *calc = conn->calc;
-	int *status = conn->status;
-
+	pthread_t main_id = conn->main_id;
+	// Detaching thread
 	pthread_detach(pthread_self());
 	free(vargp);
 	
 	// Chat with client
-	*status = chat_with_client(calc, client_fd);
+	int cmd = chat_with_client(calc, client_fd);
+	if (cmd == 1) {
+		close(server_fd);
+		calc_destroy(calc);
+		pthread_cancel(main_id);
+	}
+
 	close(client_fd);
 	return NULL;
 }
