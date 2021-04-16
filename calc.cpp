@@ -12,6 +12,7 @@
 #include <string>
 #include <sstream>
 #include <cctype>
+#include <pthread.h>
 
 using std::string;
 using std::map;
@@ -23,20 +24,20 @@ struct Calc {
 private:
     // Map to store persisting variables
     map<string, int> dictionary;
-    //pthread_mutex_t lock; 
+    pthread_mutex_t lock; 
 
 public:
 
     // Constructor 
     Calc() { 
    	// Initialize mutex
-       // pthread_mutex_lock(&lock);
+        pthread_mutex_init(&lock, NULL);
     }
 
     // Destructor
     ~Calc() { 
 	// Destroy mutex
-	//pthread_mutex_destroy(&lock);
+	pthread_mutex_destroy(&lock);
     }
 
     // Evaluates a string expression and tries to store result 
@@ -103,7 +104,7 @@ private:
         }
 
 	// CRITICAL SECTION
-	//pthread_mutex_lock(&lock);
+	pthread_mutex_lock(&lock);
 
         // Obtaining operand
         if (!evalToken(tokens[2], result)) {
@@ -112,7 +113,7 @@ private:
 	// Storing result
         dictionary[tokens[0]] = result;
 
-	//pthread_mutex_unlock(&lock);
+	pthread_mutex_unlock(&lock);
 
         return 1;
     }
@@ -130,7 +131,7 @@ private:
 
 	// CRITICAL SECTION
 	
-	//pthread_mutex_lock(&lock);
+	pthread_mutex_lock(&lock);
 
         // Attempting to obtain operands
         int val1;
@@ -150,7 +151,7 @@ private:
         // Storing value
         dictionary[tokens[0]] = result;
 
-	//pthread_mutex_unlock(&lock);
+	pthread_mutex_unlock(&lock);
 
         return 1;
     }

@@ -91,7 +91,7 @@ void *thread_start(void *vargp) {
 	
 	// Chat with client
 	int cmd = chat_with_client(calc, client_fd);
-	if (cmd == 1) {
+	if (cmd == 0) {
 		close(server_fd);
 		calc_destroy(calc);
 		pthread_cancel(main_id);
