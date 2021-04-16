@@ -16,6 +16,7 @@
 struct Client_conn {
 	// Client socket file descriptor
 	int client_fd;
+	int server_fd;
 	// Shared Calc object
 	struct Calc *calc;
 	// Pointer to server status
@@ -47,31 +48,31 @@ int main(int argc, char **argv) {
 
 	// Thread ID
 	pthread_t tid;
+	// Client fd
+	int client_fd;
 
 	// Loop to accept client requests
   	int keep_going = 1;
   	while (keep_going) {
-		struct Client_conn *conn = malloc(sizeof(struct Client_conn));
-		if (!conn) {
-			// TODO error check instead? or exit?
-			continue;
-		}
-		// Link to shared calculator
-		conn->calc = calc;
-		// Connect to server status
-		conn->status = &keep_going;
 		// Try to accept connection
-    		conn->client_fd = Accept(server_fd, NULL, NULL);
+    		client_fd = Accept(server_fd, NULL, NULL);
 
     		// Case: successful connection
-		if (conn->client_fd > 0) {
+		if (client_fd > 0) {
+			struct Client_conn *conn = malloc(sizeof(struct Client_conn));
+			if (!conn) {
+				close(client_fd);
+				continue;
+			}
+			// Link to shared calculator
+			conn->calc = calc;
+			conn->server_fd = server_fd;
+			conn->client_fd = client_fd;
+			conn->status = &keep_going;
 			// Open new thread to chat with client
 			pthread_create(&tid, NULL, thread_start, conn);
 
-		} else {
-			// Free connection storage in case of failed connection
-			free(conn);
-		}
+		} 
   	}
 	// Close server and destroy calc object
   	close(server_fd);
@@ -84,54 +85,15 @@ void *thread_start(void *vargp) {
 	// Obtaining connection info
 	struct Client_conn *conn = (struct Client_conn *)vargp;
 	int client_fd = conn->client_fd;
+	int server_fd = conn->server_fd;
 	struct Calc *calc = conn->calc;
 	int *status = conn->status;
+
 	pthread_detach(pthread_self());
 	free(vargp);
 	
-	// Process connection
-	rio_t in;
-	// Wrap to client
-	rio_readinitb(&in, client_fd);
-	// Buffer for input
-	char linebuf[LINEBUF_SIZE];
-	
-	// Loop to obtain input
-	int done = 0;
-	while (!done) {
-		// Read input
-		ssize_t n = rio_readlineb(&in, linebuf, LINEBUF_SIZE);
-		if (n <= 0) {
-			// error or end of input 
-			close(client_fd);
-			return NULL;
-		} 
-		else if (strcmp(linebuf, "quit\n") == 0 || strcmp(linebuf, "quit\r\n") == 0) {
-			// quit command 
-			close(client_fd);
-			return NULL;
-		} 
-		else if (strcmp(linebuf, "shutdown\n") == 0 || strcmp(linebuf, "shutdown\r\n") == 0) {
-      			// shutdown command 
-      			*status = 0;
-      			close(client_fd);
-      			return NULL;
-    		} 
-		else {
-			// process input line 
-			int result;
-			if (calc_eval(calc, linebuf, &result) == 0) {
-				// expression couldn't be evaluated 
-				rio_writen(client_fd, "Error\n", 6);
-			} else {
-				// output result to client 
-				int len = snprintf(linebuf, LINEBUF_SIZE, "%d\n", result);
-				if (len < LINEBUF_SIZE) {
-					rio_writen(client_fd, linebuf, len);
-				}
-			}
-		}
-	}
+	// Chat with client
+	*status = chat_with_client(calc, client_fd);
 	close(client_fd);
 	return NULL;
 }
