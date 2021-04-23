@@ -104,6 +104,7 @@ private:
         }
 
 	// CRITICAL SECTION
+	// Lock mutex
 	pthread_mutex_lock(&lock);
 
         // Obtaining operand
@@ -113,6 +114,7 @@ private:
 	// Storing result
         dictionary[tokens[0]] = result;
 
+	// Unlock mutex
 	pthread_mutex_unlock(&lock);
 
         return 1;
@@ -130,7 +132,7 @@ private:
         }
 
 	// CRITICAL SECTION
-	
+	// Lock mutex
 	pthread_mutex_lock(&lock);
 
         // Attempting to obtain operands
@@ -151,6 +153,7 @@ private:
         // Storing value
         dictionary[tokens[0]] = result;
 
+	// Unlock mutex
 	pthread_mutex_unlock(&lock);
 
         return 1;

@@ -16,12 +16,12 @@
 struct Client_conn {
 	// Client socket file descriptor
 	int client_fd;
+	// Server socket file descriptor
 	int server_fd;
 	// Shared Calc object
 	struct Calc *calc;
-	
+	// ID of main thread	
 	pthread_t main_id;
-
 }; 
 
 // Thread start function
@@ -36,7 +36,6 @@ int main(int argc, char **argv) {
 	if (argc != 2) {
 		return -1;
   	}
-
 	// Attempting to open server socket
   	int server_fd = Open_listenfd(argv[1]);
 	// Checking for success
@@ -47,7 +46,6 @@ int main(int argc, char **argv) {
   	struct Calc *calc = calc_create();
 	// Thread ID
 	pthread_t tid;
-
 	// Loop to accept client requests
   	int keep_going = 1;
   	while (keep_going) {
@@ -77,7 +75,8 @@ int main(int argc, char **argv) {
   	return 0;
 }
 
-
+// Function to start with a new thread
+// Chat with clients and deal with memory/fds
 void *thread_start(void *vargp) {
 	// Obtaining connection info
 	struct Client_conn *conn = (struct Client_conn *)vargp;
@@ -92,6 +91,7 @@ void *thread_start(void *vargp) {
 	// Chat with client
 	int cmd = chat_with_client(calc, client_fd);
 	if (cmd == 0) {
+		// Case: shutdown command
 		close(server_fd);
 		calc_destroy(calc);
 		pthread_cancel(main_id);

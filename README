@@ -1,0 +1,43 @@
+# csfProject6
+
+Shelby Coe : scoe4
+Sean Murray : smurra42
+
+Contributions:
+
+Sean:
+ - Connection data structure
+ - Threading for concurrent connections/worker function
+ - Shutdown procedure
+ - Mutex synchronization
+
+Shelby: 
+ - Determination of critical sections
+ - Mutex synchronization
+
+
+Synchronization to Protect Shared Data:
+	In our project we determined that we had two critical sections in which we must protect the shared
+	data located in the shared calc object. As explained in the assignment, any variable update of the form
+	lhs = rhs, where lhs is the variable being updated, and rhs is an expression computing the value assigned
+	to lhs, you must guarantee that any vairbale or variables accessed in rhs will not be modified while the 
+	execution of the overall assignment is in progress. In order to synchronize data accesses, we decided
+	to use a mutex object. Each calc object has its own mutex which is initialized in its constructor, and 
+	destroyed in its destructor. This allowed us to lock whenever a thread enters a critical section, and 
+	unlock upon leaving that critical section.
+
+	There are essentially 4 forms of expressions that the calc object will accept. First, there is a simple
+	token (i.e. 5, or a if the variable a has a value). This does not require any computation or synchronization.
+	Second, there is an arithmetic operation (i.e. operand operator operand). Still, there is no assignment or 
+	updating of values here, so no synchronization is required. Next, there is an assignment (variable = operand). 
+	Here is our first critical section since we have a data access and assignment. In this region of code which is
+	its own function, we lock the shared mutex before calculating the rhs, and unlock the mutex after storing it
+	in the variable. Lastly, there is an assignment with an arithmetic operation (variable = operand operator operand).
+	Again, here we have data accesses and assignment. Likewise, this region of code has its own function. Before 
+	calculating the rhs, we lock the mutex. Upon storing our result, we unlock the mutex.
+
+	These encompass all valid expressions, and thus, all cases where we may encounter a critical section. Because of 
+	this and our implemented mutex locking, we successfully added synchronization to our multithreaded calc server.
+	Thus, calculator variables are atomic as desired.
+
+
